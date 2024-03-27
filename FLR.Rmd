@@ -1,0 +1,440 @@
+---
+title: ""
+output: 
+  pdf_document: 
+    toc: FALSE
+    fig_width: 6
+    fig_height: 3.5
+    fig_caption: yes
+    number_sections: FALSE
+crossref:
+  fig-title: '**Figure**'
+  fig-labels: arabic
+  title-delim: "**.**"
+urlcolor: blue  
+fontsize: 12pt
+geometry: margin = 1 in
+header-includes:
+  - \usepackage{float}
+  - \usepackage{sectsty}
+  - \usepackage{paralist}
+  - \usepackage{setspace}\spacing{1.5}
+  - \usepackage{fancyhdr}
+  - \usepackage{lastpage}
+  - \usepackage{dcolumn}
+  - \usepackage{natbib}\bibliographystyle{agsm}
+  - \usepackage[nottoc, numbib]{tocbibind}
+  - \usepackage{booktabs}
+  - \usepackage{diagbox}
+bibliography: BIOC23 kinetics.bib
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+<!-- Cover Page -->
+
+```{=html}
+<!--The title is informative, specific and precise. It gives an accurate preview
+of what the report is about. The name and student number of all authors are 
+given with assigned job description.-->
+```
+```{=tex}
+\pagenumbering{gobble}
+\allsectionsfont{\centering}
+\subsectionfont{\raggedright}
+\subsubsectionfont{\raggedright}
+```
+````{=tex}
+\pagenumbering{gobble}
+\begin{centering}
+\vspace{2cm}
+```{r uni_logo, echo=F, out.width="100%"}
+knitr::include_graphics("BS.png")
+```
+\vspace{1cm}
+
+\Large
+
+\vspace{1cm}
+\doublespacing
+{\bf BIOC23 Lab 6 \\
+Alkaline Phosphatase Report}
+
+\vspace{0.5 cm}
+\normalsize
+\singlespacing
+
+
+\vspace{1 cm}
+{\bf \large Donglin Que\normalsize(1006741233)}
+
+\vspace{8 cm}
+Last compiled on `r format(Sys.time(), '%B %d, %Y')`
+
+\end{centering}
+````
+
+\newpage
+\pagenumbering{arabic}
+
+\newpage
+
+<!-- load packages -->
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+# load packages
+library(knitr)
+library(readxl)
+library(tidyverse)
+library(ggplot2)
+library(ggpubr)
+library(ggpmisc)
+library(matrixStats)
+library(captioner)
+library(latex2exp)
+library(xtable)
+opts_chunk$set(echo = FALSE)
+```
+
+### Introduction
+
+<!--This section has a logical organization and moves from general to specific. It provides sufficient background to understand the goal and content of the report. It has a clear explanation of why this work is important and relevant. The last few sentences of this section clearly present the goal of the study.-->
+
+
+Enzyme kinetics is the study of the rate of a chemical reaction catalyzed by an enzyme by measuring the reaction rate and studying the effect of changing the reaction conditions[@srinivasanGuideMichaelisMenten2022]. Alkaline phosphatase (ALP) is an orthophosphate monoester phosphohydrolase. It is found in many tissues throughout the body and also involved in many biological processes [@sardiwalBoneAlkalinePhosphatase2013]. In this experiment, we used ALP to study its enzyme kinetics in different substrate, enzyme and inhibitor concentrations.
+
+
+
+
+
+
+
+
+
+### Standard curve of Extinction Coefficient ($\varepsilon$)
+
+Spectrophotometry is commonly used to observe changes in light absorption between products and reactants[@bzuraPhotometricFluorometricAlkaline2018]. In this experiment, we used p-nitrophenyl disodium orthophosphate (pNPP) as ALP substrate, which does not absorb 405 nm wavelength but ALP promotes hydrolysis to produce yellow p-nitrophenol anion (pNP), which has absorption at 405 nm [@bellAlkalinePhosphataseLab2023].
+
+
+```{r, include=FALSE}
+stdcuv <- read_excel("enzyme.xlsx", sheet = "std curve")
+stdcuv
+```
+
+```{r, fig.width = 6, fig.height = 2, fig.cap = "Standard curve for p-nitrophenol with extinction coefficient. The abscissa (x) of this figure represents the concentration of pNP ($mM$), and the ordinate (y) represents the absorption value of pNP at a wavelength of 405 nm. The regression equation through the origin and the coefficient of determination ($R^2$) for the data are shown in the upper left corner of the figure.", echo=FALSE, warning = FALSE, message = FALSE , results='hide'}
+ggplot(stdcuv, aes(y = Absorbance, x = PNP_Concentration)) +
+  geom_point() +
+  geom_smooth(method = "lm", formula = y ~ x - 1, se = FALSE)  +
+  labs(x = TeX("p-Nitrophenol concentration ($mM$)"), y = TeX("Absorbance ($A_{405}$ nm)")) + 
+  stat_poly_eq(formula = y ~ x-1,
+               aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")),
+               parse = TRUE, coef.digits = 6, f.digits = 6)
+```
+
+
+By Beer-Lambert law ($A = \varepsilon b \times C$) and $b = 1 \ cm$, the slope is the desired extinction coefficient $\varepsilon$ (*Fig.1*). The $\varepsilon$ of PNP is 19.4667 $mM^{-1}cm^{-1}$, slightly larger than the value in the literature 15.3 $mM^{-1}cm^{-1}$. It is still acceptable because different glass tubes may have different refraction and absorption rate of light.
+
+
+
+
+
+
+
+
+
+
+
+
+### $v_0$ $vs.$ enzyme concentration
+
+From *Fig.2*, when $pH=8.0$ and the substrate content is the same, $v_0$ increases with the increase of enzyme concentration, which is in line with our expectation.
+
+```{r, include=FALSE}
+v0enz <- read_excel("BIOC23 Data 1.xlsx", sheet = "Sheet2")
+v0enz
+```
+
+
+```{r, fig.width = 6.5, fig.height = 3, fig.cap = "Group and class average initial velocity at different enzyme concentration. The x-axis of this graph represents ALP enzyme concentration $(\\mu g/ml)$, and the y-axis is $v_0$ $(\\mu mol/min)$. The upper left corner of the picture shows the coefficient of determination and the linear regression equation through the origin. The two sets of data in the figure are the results of our group and the average value of the class. The average value of the class has an error bar, and the data comes from the standard deviation.", echo=FALSE}
+library(matrixStats)
+v0enz_means <- v0enz %>%
+  select(-`AP enzyme concentration (μg/ml)`) %>%
+  rowMeans() %>%
+  tibble(val_mean = .)
+
+v0enz_sd <- v0enz %>%
+  select(-`AP enzyme concentration (μg/ml)`) %>%
+  as.matrix() %>%
+  rowSds() %>%
+  tibble(sd = .)
+
+dat <- cbind(v0enz_means, v0enz_sd, conc = v0enz$`AP enzyme concentration (μg/ml)`, val_DT = v0enz$`D-T`) %>%
+  pivot_longer(starts_with("val"), names_to = "Group", values_to = "Value") %>%
+  arrange(Group)
+
+dat_ci <- tibble(
+  start_ci = c(rep(NA, 4), t(v0enz_means - v0enz_sd)),
+  end_ci = c(rep(NA, 4), t(v0enz_means + v0enz_sd)), 
+  means = c(rep(NA, 4), t(v0enz$`AP enzyme concentration (μg/ml)`))
+)
+
+dat_new <- cbind(dat, dat_ci)
+
+dat_new %>%
+  ggplot(aes(x = conc, y= Value, colour = Group)) + 
+  geom_errorbar(aes(ymin = start_ci, ymax = end_ci), colour = "black", width = .01) +
+  geom_point() +
+  geom_smooth(mapping = aes(x = conc, y = Value, colour = Group), formula = y ~ x-1, method = "lm", se = FALSE)+
+  labs(x = TeX("ALP enzyme concentration ($\\mu g/ml$)"), y = TeX("$v_0$ ($\\mu mol/min$)"), fill = "Data") + 
+  scale_color_discrete(name = "Data", labels=c("Group", "Class average")) +
+  stat_poly_eq(data = dat_new, method = "lm", formula = y ~ x-1,
+               aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")),
+               parse = TRUE, coef.digits = 10, f.digits = 10) 
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### $v_0$ $vs.$ substrate concentration
+
+```{r, include=FALSE}
+v0conc <- read_excel("BIOC23 Data 1.xlsx", sheet = "Sheet3")
+v0conc
+```
+
+```{r, fig.width = 6.5, fig.height = 3, fig.cap = "Group and class average initial velocity at different substrate concentration. The x-axis in this figure represents the pNPP concentration $(\\mu g/ml)$, and the y-axis is the initial velocity $(\\mu mol/min)$. The upper left corner of the picture shows the logarithmic regression equation through the origin and its $R^2$. The two sets of data in the figure are the results of our group and the average value of the class. The average value of the class has an error bar, and the data comes from the standard deviation.", echo=FALSE}
+v0conc_means <- v0conc %>%
+  select(-`p-nitrophenyl phosphate concentration (μg/ml)`) %>%
+  rowMeans() %>%
+  tibble(val_mean = .)
+
+v0conc_sd <- v0conc %>%
+  select(-`p-nitrophenyl phosphate concentration (μg/ml)`) %>%
+  as.matrix() %>%
+  rowSds() %>%
+  tibble(sd = .)
+
+datconc <- cbind(v0conc_means, v0conc_sd, conc = v0conc$`p-nitrophenyl phosphate concentration (μg/ml)`, val_DT = v0conc$`D-T`) %>%
+  pivot_longer(starts_with("val"), names_to = "Group", values_to = "Value") %>%
+  arrange(Group)
+
+datconc_ci <- tibble(
+  start_ci = c(rep(NA, 5), t(v0conc_means - v0conc_sd)),
+  end_ci = c(rep(NA, 5), t(v0conc_means + v0conc_sd)), 
+  means = c(rep(NA, 5), t(v0conc$`p-nitrophenyl phosphate concentration (μg/ml)`))
+)
+
+datconc_new <- cbind(datconc, datconc_ci)
+
+datconc_new %>%
+  ggplot(aes(x = conc, y= Value, colour = Group)) + 
+  geom_errorbar(aes(ymin = start_ci, ymax = end_ci), colour = "black", width = 1) +
+  geom_point() +
+  geom_smooth(mapping = aes(x = conc, y = Value, colour = Group), formula = y ~ log(x), method = "lm", se = FALSE) +
+  labs(x = TeX("p-nitrophenyl phosphate concentration ($\\mu g/ml$)"), y = TeX("$v_0$ ($\\mu mol/min$)")) + 
+  scale_color_discrete(name = "Data", labels=c("Group", "Class average")) +
+  stat_poly_eq(data = datconc_new, formula = y ~ log(x),
+               eq.x.rhs = "~ln(x)",
+               aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")),
+               parse = TRUE, coef.digits = 5, f.digits = 5) 
+```
+
+In *Fig.3*, we use the logarithm to represent the relationship between the substrate and $v_0$ because the pairing of the enzyme and the substrate has an upper limit, and increasing the concentration of the substrate after that will not lead to an increase in the initial reaction rate, because the enzyme has already Saturated.
+
+
+
+
+
+
+
+
+
+
+
+
+###  Linweaver-Burk plot
+
+```{r, fig.width = 6.5, fig.height = 3, fig.cap = "Linweaver-Burk plot from group and class average $v_o$ of different substrate concentrations. In the LB plot, the x-axis represents the reciprocal of the substrate concentration, and the y-axis represents the reciprocal of the initial velocity. Both the regression equation and $R^2$ are shown in the upper left corner of the plot. Data sources for this figure are group and class means (with error bars) respectively.", echo=FALSE}
+v0conc %>% mutate(`1/s` = 1/`p-nitrophenyl phosphate concentration (μg/ml)`) %>% 
+  mutate(EW = 1/`E-W`) %>% 
+  mutate(JJ = 1/`J-J`) %>% 
+  mutate(JL = 1/`J-L`) %>% 
+  mutate(GY = 1/`G-Y`) %>% 
+  mutate(YI = 1/`Y-I`) %>% 
+  mutate(TC = 1/`T-C`) %>% 
+  mutate(IZ = 1/`I-Z`) %>% 
+  mutate(DT = 1/`D-T`) %>% 
+  mutate(YE = 1/`Y-E`) %>% 
+  select(`1/s`:YE) -> s
+
+s_means <- s %>%
+  select(-`1/s`) %>%
+  rowMeans() %>%
+  tibble(val_mean = .)
+
+
+s_sd <- s %>%
+  select(-`1/s`) %>%
+  as.matrix() %>%
+  rowSds() %>%
+  tibble(sd = .)
+
+dats <- cbind(s_means, s_sd, conc = s$`1/s`, val_DT = s$DT) %>%
+  pivot_longer(starts_with("val"), names_to = "Group", values_to = "Value") %>%
+  arrange(Group)
+
+datsc_ci <- tibble(
+  start_ci = c(rep(NA, 5), t(s_means - s_sd)),
+  end_ci = c(rep(NA, 5), t(s_means + s_sd)), 
+  means = c(rep(NA, 5), t(s$`1/s`))
+)
+
+dats_new <- cbind(dats, datsc_ci)
+
+
+dats_new %>%
+  ggplot(aes(x = conc, y= Value, colour = Group)) + 
+  geom_errorbar(aes(ymin = start_ci, ymax = end_ci), colour = "black", width = .002) +
+  geom_point() +
+  geom_smooth(mapping = aes(x = conc, y = Value, colour = Group), formula = y ~ x, method = "lm", se = FALSE) +
+  labs(x = TeX("$1/[S]$"), y = TeX("$\\frac{1}{v_0}$")) + 
+  scale_color_discrete(name = "Data", labels=c("Group", "Class average")) +
+  stat_poly_eq(data = dats_new, formula = y ~ x,method = "lm",
+               aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")),
+               parse = TRUE, coef.digits = 5, f.digits = 5) 
+```
+
+
+The regression equation in the Lineweaver–Burk plot below in *Fig.4* shows the Lineweaver–Burk equation: $\frac{1}{v_0} = (\frac{K_m}{V_{max}})\frac{1}{[S]} + \frac{1}{V_{max}}$. Based on the equation, we can calculate the $K_m$ and $V_{max}$. The process and result is shown in *Table 1*.
+
+
+```{r results = 'asis', include=FALSE}
+library(xtable)
+# Preset some options for printing your xtables
+options(xtable.caption.placement = 'top', # notice \floatsetup overrides
+        xtable.include.rownames = FALSE,
+        xtable.comment = FALSE,
+        xtable.booktabs = TRUE)
+
+xtable(
+  data.frame(
+    D = c(1L, 2L, 4L),
+    a = c(59L, 54L, 73L),
+    b = c('m', 'm', 'f'),
+    zone = rep(2L, 3)),
+  caption = 'This is a table')
+```
+
+
+\begin{table}[ht]
+\caption{Calculation of $K_m$ and $V_{max}$} 
+\centering
+\begin{tabular}{ccccc}
+\toprule
+ \diagbox{Data}{Value} & $\frac{K_m}{V_{max}}$ & $\frac{1}{V_{max}}$ & $K_m \ (\frac{K_m}{V_{max}} / \frac{1}{V_{max}})$ & $V_{max} \  ( (\frac{1}{V_{max}})^{-1})$ \\ \midrule
+  Group data & 0.05094 & 0.026002 & 0.05094/0.026002 =  1.95908 & 1/0.026002 = 38.45858 \\ 
+  Class average & 0.26045 & 0.029732 & 0.26045/0.029732 = 8.759922 & 1/0.029732 = 33.6338 \\ \bottomrule
+\end{tabular}
+\end{table}
+
+<!--
+| cc | $\frac{K_m}{V_{max}}$ | $\frac{1}{V_{max}}$ | $K_m \ (\frac{K_m}{V_{max}} / \frac{1}{V_{max}})$ | $V_{max} \  ( (\frac{1}{V_{max}})^{-1})$ |
+|:--------:|:------:|:-------:|:-------:|:-------:|
+| Group data | 0.05094 | 0.026002 | 0.05094/0.026002 =  1.95908 | 1/0.026002 = 38.45858 |
+-->
+
+$V_{max}$ is the maximum reaction speed, $K_m$ represents the Michaelis constant, which is an index to measure the enzymatic ability [@srinivasanGuideMichaelisMenten2022]. A lower $K_m$ means that less substrate is needed to reach half the maximum rate of the enzyme, the results of our group show that we have a higher $V_{max}$ and a lower $K_m$ than the class average, which explains why in previous figures our group are having a higher $v_0$.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Effect of EDTA on $v_0$
+
+EDTA is a chelating agent that can combine with divalent metal ions to form a stable and inert complex [@ghoshCrystalStructureRat2013]. For ALP, divalent metal ions are an activator [@bellAlkalinePhosphataseLab2023], EDTA as an inhibitor snatches away the divalent metal ions that should be combined with ALP, so it can be seen from *Fig.5* that the initial speed of the reaction increases with EDTA decrease with increasing concentration.
+
+```{r, include=FALSE}
+edta <- read_excel("BIOC23 Data 2.xlsx", sheet = "Sheet2")
+edta
+```
+
+
+```{r, fig.width = 6.5, fig.height = 2.5, fig.cap = "Effect of EDTA on $v_0$. The x-axis of this figure represents the number of parts of EDTA (multiplied by the concentration of one part of EDTA to get the total concentration), and the y-axis is the initial velocity. The two sets of data in the figure are the results of our group and the average value of the class respectively. The average value of the class has data from the standard deviation error bar.", echo=FALSE}
+edta_means <- edta %>%
+  select(-`EDTA concentration (mM)`) %>%
+  rowMeans(na.rm = TRUE) %>%
+  tibble(val_mean = .)
+
+edta_sd <- edta %>%
+  select(-`EDTA concentration (mM)`) %>%
+  as.matrix() %>%
+  rowSds(na.rm = TRUE) %>%
+  tibble(sd = .)
+
+datedta <- cbind(edta_means, edta_sd, conc = edta$`EDTA concentration (mM)`, val_DT = edta$`D-T`) %>%
+  pivot_longer(starts_with("val"), names_to = "Group", values_to = "Value") %>%
+  arrange(Group)
+
+datedta_ci <- tibble(
+  start_ci = c(rep(NA, 3), t(edta_means - edta_sd)),
+  end_ci = c(rep(NA, 3), t(edta_means + edta_sd)), 
+  means = c(rep(NA, 3), t(edta$`EDTA concentration (mM)`))
+)
+
+datedta_new <- cbind(datedta, datedta_ci)
+
+datedta_new %>%
+  ggplot(aes(x = conc, y= Value)) + 
+  geom_col(aes(fill = Group), position = "dodge") +
+  labs(x = TeX("EDTA Concentration ($\\times 10^{-4} M$)"), y = TeX("$V_0$ ($\\mu mol/min$)")) + 
+  scale_fill_discrete("", labels=c("Group", "Class average")) +
+  geom_errorbar(aes(x = conc+0.225, ymin = start_ci, ymax = end_ci), colour = "black", width = .1)
+```
+
+
+
+
+
+\newpage
+
+### Acknowledgement
+
+I would like to extend my sincere thanks to Dr. Ken Butler and Alexandra Bushby from my STAC33 course for their invaluable guidance and support in modifying data and generating figures using R, which was crucial to the success of this report. 
+
+Additionally, I must also thank Professor Emily Bell, whose lectures and course materials were instrumental in enhancing my understanding of the concepts. I am also grateful to Zeynep Bekci, our lab TA in BIOC23, for her dedicated support in clarifying the calculations of this report. 
+
+Many thanks to all those who provided me with the assistance and insights necessary to complete this project successfully. 
+
+# Reference
+
+\small
